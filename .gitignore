@@ -51,6 +51,8 @@ local_data/
 storage/minio/
 kuzu_db/
 memgraph_data/
+data/
+**/data/
 
 # OS & IDE
 .DS_Store

@@ -61,7 +61,7 @@ class KnowledgeGraphEngine:
         nodes: List[GraphNodeData],
         edges: List[GraphEdgeData]
     ) -> None:
-        """Ingest nodes and edges into the workspace knowledge graph."""
+        """Ingest nodes and edges into the workspace knowledge graph and compute community clusters."""
         if workspace_id not in self._memory_nodes:
             self._memory_nodes[workspace_id] = {}
             self._memory_edges[workspace_id] = []
@@ -72,9 +72,62 @@ class KnowledgeGraphEngine:
         for edge in edges:
             self._memory_edges[workspace_id].append(edge)
 
+        # 1. Compute Degree Centrality
+        degree_map: Dict[str, int] = {nid: 0 for nid in self._memory_nodes[workspace_id]}
+        adjacency: Dict[str, List[str]] = {nid: [] for nid in self._memory_nodes[workspace_id]}
+
+        for edge in self._memory_edges[workspace_id]:
+            if edge.source in degree_map:
+                degree_map[edge.source] += 1
+            if edge.target in degree_map:
+                degree_map[edge.target] += 1
+            if edge.source in adjacency and edge.target in adjacency:
+                adjacency[edge.source].append(edge.target)
+                adjacency[edge.target].append(edge.source)
+
+        for nid, deg in degree_map.items():
+            self._memory_nodes[workspace_id][nid].degree = max(1, deg)
+
+        # 2. Graph RAG Community Detection: Connected Components & Label Propagation
+        visited = set()
+        community_counter = 0
+
+        for nid in list(self._memory_nodes[workspace_id].keys()):
+            if nid not in visited:
+                component_queue = [nid]
+                visited.add(nid)
+                while component_queue:
+                    curr = component_queue.pop(0)
+                    self._memory_nodes[workspace_id][curr].community_id = community_counter
+                    for neighbor in adjacency.get(curr, []):
+                        if neighbor not in visited:
+                            visited.add(neighbor)
+                            component_queue.append(neighbor)
+                community_counter += 1
+
         logger.info(
-            f"Ingested {len(nodes)} nodes and {len(edges)} edges into workspace {workspace_id}."
+            f"Ingested {len(nodes)} nodes and {len(edges)} edges into workspace {workspace_id}. "
+            f"Detected {community_counter} graph communities."
         )
+
+    async def get_community_summary(self, workspace_id: str) -> str:
+        """Generate structured community cluster summary for Agentic RAG Scripter."""
+        nodes_dict = self._memory_nodes.get(workspace_id, {})
+        if not nodes_dict:
+            return "No graph knowledge clusters detected."
+
+        communities: Dict[int, List[str]] = {}
+        for node in nodes_dict.values():
+            cid = node.community_id or 0
+            if cid not in communities:
+                communities[cid] = []
+            communities[cid].append(f"{node.label} ({node.category})")
+
+        lines = []
+        for cid, entity_list in sorted(communities.items()):
+            lines.append(f"Cluster #{cid + 1}: {', '.join(entity_list[:8])}")
+
+        return "\n".join(lines)
 
     async def get_workspace_graph(self, workspace_id: str) -> KnowledgeGraphResult:
         """Retrieve full or subgraph for a workspace."""

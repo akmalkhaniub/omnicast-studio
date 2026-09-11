@@ -98,3 +98,107 @@ async def test_rss_podcast_feed_generation():
     assert "<title>OmniCast: Deep-Tech Audits</title>" in rss_xml
     assert 'url="http://localhost:8000/audio/ep_1.mp3"' in rss_xml
     assert 'type="audio/mpeg"' in rss_xml
+
+
+@pytest.mark.asyncio
+async def test_universal_document_ingestion():
+    """Verify markdown chunking and YouTube video ID extraction."""
+    from omnicast.ingestion.extractors import universal_ingestion, YouTubeTranscriptExtractor
+
+    # 1. Test Markdown extraction & semantic chunking
+    sample_md = """# OmniCast Studio Architecture
+
+## Audio Engine
+The audio engine runs full-duplex with sub-300ms latency.
+
+## Graph RAG
+The Graph RAG pipeline discovers latent relational bridges across scientific research papers.
+"""
+    doc = await universal_ingestion.ingest_file(sample_md.encode("utf-8"), "architecture.md")
+    assert doc.title == "OmniCast Studio Architecture"
+    assert doc.source_type == "MARKDOWN"
+    assert len(doc.chunks) >= 1
+    assert "Graph RAG" in doc.content
+
+    # 2. Test YouTube URL parser
+    yt_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    vid_id = YouTubeTranscriptExtractor.parse_video_id(yt_url)
+    assert vid_id == "dQw4w9WgXcQ"
+
+
+@pytest.mark.asyncio
+async def test_graph_community_detection():
+    """Verify community detection clustering and degree calculation."""
+    engine = KnowledgeGraphEngine()
+    ws_id = "test_cluster_ws"
+
+    # Cluster 1: Machine Learning
+    nodes = [
+        GraphNodeData(id="n1", label="Transformers", category="Model"),
+        GraphNodeData(id="n2", label="Self-Attention", category="Mechanism"),
+        # Cluster 2: Infrastructure
+        GraphNodeData(id="n3", label="Kubernetes", category="Infra"),
+        GraphNodeData(id="n4", label="Docker", category="Container"),
+    ]
+    edges = [
+        GraphEdgeData(id="e1", source="n1", target="n2", relationship="USES"),
+        GraphEdgeData(id="e2", source="n3", target="n4", relationship="ORCHESTRATES"),
+    ]
+
+    await engine.ingest_entities(ws_id, nodes, edges)
+    graph = await engine.get_workspace_graph(ws_id)
+
+    # Check degrees
+    node_map = {n.id: n for n in graph.nodes}
+    assert node_map["n1"].degree == 1
+    assert node_map["n2"].degree == 1
+
+    # Check distinct communities were identified
+    comm_1 = node_map["n1"].community_id
+    comm_2 = node_map["n2"].community_id
+    comm_3 = node_map["n3"].community_id
+    assert comm_1 == comm_2
+    assert comm_1 != comm_3
+
+    summary = await engine.get_community_summary(ws_id)
+    assert "Cluster #1" in summary
+    assert "Cluster #2" in summary
+
+
+@pytest.mark.asyncio
+async def test_remotion_video_renderer():
+    """Verify Remotion composition props creation and render output."""
+    from omnicast.video.renderer import video_renderer, VideoCompositionType
+    from omnicast.storage.models import DialogueTurn, SpeakerIdentity
+
+    dialogue = [
+        DialogueTurn(
+            id="turn_1",
+            speaker=SpeakerIdentity.HOST_A,
+            text="Welcome to OmniCast Studio.",
+            start_ms=0,
+            end_ms=2500,
+        ),
+        DialogueTurn(
+            id="turn_2",
+            speaker=SpeakerIdentity.HOST_B,
+            text="Today we explore the Graph RAG engine.",
+            start_ms=2500,
+            end_ms=5000,
+        ),
+    ]
+
+    result = await video_renderer.render_composition(
+        episode_id="ep_test_vid",
+        title="OmniCast Deep Dive",
+        dialogue=dialogue,
+        audio_url="/audio/ep_test_vid.mp3",
+        composition=VideoCompositionType.WIDESCREEN_PODCAST,
+    )
+
+    assert result.status == "READY"
+    assert "ep_test_vid_widescreenpodcast" in result.render_id
+    assert result.video_url.endswith(".mp4")
+    assert result.duration_frames > 0
+    assert result.metadata["resolution"] == "1920x1080"
+    assert result.metadata["total_subtitles"] == 2

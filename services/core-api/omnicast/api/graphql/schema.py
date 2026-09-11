@@ -21,6 +21,8 @@ from omnicast.knowledge_graph.engine import graph_engine, GraphNodeData
 from omnicast.agentic_rag.planner import planner
 from omnicast.agentic_rag.scripter import scripter
 from omnicast.audio.synthesizer import audio_synthesizer
+from omnicast.ingestion.extractors import universal_ingestion
+from omnicast.video.renderer import video_renderer, VideoCompositionType
 
 
 # In-memory store for fallback / dev without live MongoDB
@@ -335,13 +337,28 @@ class Mutation:
     async def ingest_document(self, input: IngestDocumentInput) -> SourceDocument:
         doc_id = str(uuid4())
         ws_id = str(input.workspace_id)
+
+        # Dispath universal ingestion for web / YouTube URLs or raw text
+        cleaned_content = input.content
+        extracted_title = input.title
+        trimmed = input.content.strip()
+
+        if trimmed.startswith(("http://", "https://")):
+            try:
+                extract = await universal_ingestion.ingest_url(trimmed)
+                cleaned_content = extract.content
+                if not extracted_title or extracted_title == "Web Document":
+                    extracted_title = extract.title
+            except Exception as err:
+                cleaned_content = input.content
+
         doc = MongoSourceDocument(
             id=doc_id,
             workspace_id=ws_id,
-            title=input.title,
+            title=extracted_title,
             source_type=MongoSourceType(input.source_type.value),
-            content=input.content,
-            token_count=len(input.content.split()),
+            content=cleaned_content,
+            token_count=len(cleaned_content.split()),
             created_at=datetime.now(timezone.utc)
         )
         if ws_id not in _mem_sources:
@@ -350,9 +367,9 @@ class Mutation:
 
         # Extract entities directly into Knowledge Graph
         nodes, edges = await planner.extract_knowledge_graph(
-            document_text=input.content,
+            document_text=cleaned_content,
             source_id=doc_id,
-            source_title=input.title
+            source_title=extracted_title
         )
         await graph_engine.ingest_entities(ws_id, nodes, edges)
 
@@ -373,17 +390,27 @@ class Mutation:
         ws_title = ws.title if ws else "Research Workspace"
         sources = [{"id": d.id, "title": d.title} for d in _mem_sources.get(ws_id, [])]
 
-        # 1. Scripting
+        # 1. Scripting with Graph RAG Community Summary
+        kg_summary = await graph_engine.get_community_summary(ws_id)
         dialogue = await scripter.generate_episode_script(
             workspace_title=ws_title,
             sources=sources,
-            knowledge_graph_summary="Graph RAG clusters",
+            knowledge_graph_summary=kg_summary,
             target_minutes=input.target_duration_minutes
         )
 
         # 2. Synthesize audio
         audio_url = await audio_synthesizer.synthesize_episode(ep_id, dialogue)
         total_duration = dialogue[-1].end_ms if dialogue else 0
+
+        # 3. Render Remotion Video Composition
+        video_result = await video_renderer.render_composition(
+            episode_id=ep_id,
+            title=f"Deep-Dive: {input.topic or ws_title}",
+            dialogue=dialogue,
+            audio_url=audio_url,
+            composition=VideoCompositionType.WIDESCREEN_PODCAST,
+        )
 
         ep = MongoEpisode(
             id=ep_id,
@@ -408,6 +435,14 @@ class Mutation:
             audio_url=ep.audio_url,
             duration_ms=ep.duration_ms,
             status=SynthesisStatus.COMPLETED,
+            video_composition=VideoComposition(
+                id=strawberry.ID(video_result.render_id),
+                widescreen_url=video_result.video_url,
+                vertical_short_url=f"/video/{ep_id}_verticalshort.mp4",
+                fps=video_result.fps,
+                duration_frames=video_result.duration_frames,
+                render_status=video_result.status,
+            ),
             dialogue=[
                 DialogueTurn(
                     id=t.id,

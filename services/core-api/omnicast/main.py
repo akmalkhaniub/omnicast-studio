@@ -22,8 +22,9 @@ async def lifespan(app: FastAPI):
     await init_db(mock_mode=False)
     # Initialize Knowledge Graph
     await graph_engine.initialize()
-    # Ensure audio cache directory exists
+    # Ensure audio and video cache directories exist
     os.makedirs("./data/audio_cache", exist_ok=True)
+    os.makedirs("./data/video_cache", exist_ok=True)
     yield
 
 
@@ -49,9 +50,11 @@ app.include_router(graphql_app, prefix="/graphql")
 # Mount Voice Streaming WebSocket
 app.add_api_websocket_route("/api/v1/voice/live", voice_websocket_handler)
 
-# Mount Static Audio Files
-if os.path.exists("./data/audio_cache"):
-    app.mount("/audio", StaticFiles(directory="./data/audio_cache"), name="audio")
+# Mount Static Audio and Video Media Files
+os.makedirs("./data/audio_cache", exist_ok=True)
+os.makedirs("./data/video_cache", exist_ok=True)
+app.mount("/audio", StaticFiles(directory="./data/audio_cache"), name="audio")
+app.mount("/video", StaticFiles(directory="./data/video_cache"), name="video")
 
 
 @app.get("/healthz")
