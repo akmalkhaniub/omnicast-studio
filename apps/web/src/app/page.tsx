@@ -11,13 +11,23 @@ import {
   ExternalLink,
   CheckCircle2,
   Cpu,
+  Plus,
 } from 'lucide-react';
 import { MindMapCanvas } from '@/features/mind-map/MindMapCanvas';
 import { WaveformPlayer } from '@/features/audio-studio/WaveformPlayer';
 import { AudioWorkletController } from '@/features/voice-live/AudioWorkletController';
+import { DocumentIngestionModal } from '@/features/document-viewer/DocumentIngestionModal';
+import { PodcastGenerationModal } from '@/features/audio-studio/PodcastGenerationModal';
+import { SyndicationModal } from '@/features/syndication/SyndicationModal';
 
 export default function StudioPage() {
   const [activeTab, setActiveTab] = useState<'mindmap' | 'documents'>('mindmap');
+  const [workspaceId] = useState<string>('default_workspace');
+
+  // Modals state
+  const [isIngestOpen, setIsIngestOpen] = useState(false);
+  const [isPodcastOpen, setIsPodcastOpen] = useState(false);
+  const [isSyndicateOpen, setIsSyndicateOpen] = useState(false);
 
   return (
     <div className="flex flex-col h-screen w-screen bg-zinc-950 text-zinc-100 overflow-hidden">
@@ -43,9 +53,19 @@ export default function StudioPage() {
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
             <span>Graph RAG Active</span>
           </div>
-          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition shadow">
+          <button
+            onClick={() => setIsPodcastOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition shadow"
+          >
+            <Radio className="w-3.5 h-3.5" />
+            <span>Generate Episode</span>
+          </button>
+          <button
+            onClick={() => setIsSyndicateOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 rounded-lg text-xs font-medium transition shadow"
+          >
             <Share2 className="w-3.5 h-3.5" />
-            <span>1-Click Publish (RSS/YT)</span>
+            <span>Publish (RSS/YT)</span>
           </button>
         </div>
       </header>
@@ -80,9 +100,12 @@ export default function StudioPage() {
               </button>
             </div>
 
-            <button className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 bg-zinc-900 border border-zinc-800 px-2.5 py-1 rounded-md transition">
-              <UploadCloud className="w-3.5 h-3.5" />
-              <span>Add Source (PDF / URL / YT)</span>
+            <button
+              onClick={() => setIsIngestOpen(true)}
+              className="flex items-center gap-1.5 text-xs text-zinc-200 hover:text-white bg-indigo-950/60 border border-indigo-800/80 px-2.5 py-1 rounded-md transition shadow"
+            >
+              <UploadCloud className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Add Source (PDF / URL / Doc)</span>
             </button>
           </div>
 
@@ -91,7 +114,15 @@ export default function StudioPage() {
               <MindMapCanvas />
             ) : (
               <div className="w-full h-full bg-zinc-900/60 border border-zinc-800 rounded-lg p-4 text-xs text-zinc-300 overflow-y-auto">
-                <h3 className="font-semibold text-zinc-200 mb-2">Ingested Research Corpus</h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-zinc-200">Ingested Research Corpus</h3>
+                  <button
+                    onClick={() => setIsIngestOpen(true)}
+                    className="flex items-center gap-1 text-[11px] text-indigo-400 hover:text-indigo-300"
+                  >
+                    <Plus className="w-3 h-3" /> Add More
+                  </button>
+                </div>
                 <ul className="space-y-2">
                   <li className="p-3 bg-zinc-950/80 rounded border border-zinc-800 flex justify-between items-center">
                     <div>
@@ -104,6 +135,13 @@ export default function StudioPage() {
                     <div>
                       <span className="font-medium text-indigo-400">2. Graph RAG vs Baseline Retrieval.pdf</span>
                       <p className="text-zinc-400 text-[11px]">28,400 tokens · 12 concepts extracted · Grounded</p>
+                    </div>
+                    <span className="text-xs text-emerald-400 font-mono">100% Verified</span>
+                  </li>
+                  <li className="p-3 bg-zinc-950/80 rounded border border-zinc-800 flex justify-between items-center">
+                    <div>
+                      <span className="font-medium text-indigo-400">3. System Architecture Specification (SPEC.md)</span>
+                      <p className="text-zinc-400 text-[11px]">14,200 tokens · 9 concepts extracted · Grounded</p>
                     </div>
                     <span className="text-xs text-emerald-400 font-mono">100% Verified</span>
                   </li>
@@ -131,13 +169,36 @@ export default function StudioPage() {
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
             <span>FastAPI Core: Ready</span>
           </span>
-          <span>Feed: http://localhost:8000/feed/default/podcast.xml</span>
+          <span>Feed: http://localhost:8000/feed/default_workspace/podcast.xml</span>
         </div>
         <div className="flex items-center gap-3">
           <span>EBU R128: -16.1 LUFS</span>
           <span>AudioWorklet: 16kHz PCM</span>
         </div>
       </footer>
+
+      {/* Modals */}
+      <DocumentIngestionModal
+        workspaceId={workspaceId}
+        isOpen={isIngestOpen}
+        onClose={() => setIsIngestOpen(false)}
+        onIngestSuccess={() => {
+          setActiveTab('documents');
+        }}
+      />
+
+      <PodcastGenerationModal
+        workspaceId={workspaceId}
+        isOpen={isPodcastOpen}
+        onClose={() => setIsPodcastOpen(false)}
+        onEpisodeGenerated={() => {}}
+      />
+
+      <SyndicationModal
+        workspaceId={workspaceId}
+        isOpen={isSyndicateOpen}
+        onClose={() => setIsSyndicateOpen(false)}
+      />
     </div>
   );
 }
