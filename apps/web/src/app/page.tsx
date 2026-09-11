@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   Cpu,
   Plus,
+  ShieldCheck,
 } from 'lucide-react';
 import { MindMapCanvas } from '@/features/mind-map/MindMapCanvas';
 import { WaveformPlayer } from '@/features/audio-studio/WaveformPlayer';
@@ -19,9 +20,10 @@ import { AudioWorkletController } from '@/features/voice-live/AudioWorkletContro
 import { DocumentIngestionModal } from '@/features/document-viewer/DocumentIngestionModal';
 import { PodcastGenerationModal } from '@/features/audio-studio/PodcastGenerationModal';
 import { SyndicationModal } from '@/features/syndication/SyndicationModal';
+import { EvaluationDashboard } from '@/features/observability/EvaluationDashboard';
 
 export default function StudioPage() {
-  const [activeTab, setActiveTab] = useState<'mindmap' | 'documents'>('mindmap');
+  const [activeTab, setActiveTab] = useState<'mindmap' | 'documents' | 'evaluation'>('mindmap');
   const [workspaceId] = useState<string>('default_workspace');
 
   // Bi-directional Mind Map ↔ Audio Playback state
@@ -113,6 +115,17 @@ export default function StudioPage() {
                 <FileText className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Ingested Sources (3 Docs)</span>
               </button>
+              <button
+                onClick={() => setActiveTab('evaluation')}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                  activeTab === 'evaluation'
+                    ? 'bg-zinc-800 text-zinc-100 border border-zinc-700'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-rose-400" />
+                <span>RAG Triad & Evals (DeepEval)</span>
+              </button>
             </div>
 
             <button
@@ -130,7 +143,7 @@ export default function StudioPage() {
                 activeEntityId={activeEntityId}
                 onSelectEntity={handleSelectEntity}
               />
-            ) : (
+            ) : activeTab === 'documents' ? (
               <div className="w-full h-full bg-zinc-900/60 border border-zinc-800 rounded-lg p-4 text-xs text-zinc-300 overflow-y-auto">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold text-zinc-200">Ingested Research Corpus</h3>
@@ -165,6 +178,8 @@ export default function StudioPage() {
                   </li>
                 </ul>
               </div>
+            ) : (
+              <EvaluationDashboard episodeId="ep_current_01" />
             )}
           </div>
         </section>

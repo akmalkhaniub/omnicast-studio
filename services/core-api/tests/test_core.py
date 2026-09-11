@@ -283,3 +283,40 @@ async def test_presentation_slide_generator():
     assert deck.svg_infographic_url.endswith(".svg")
     assert len(deck.slides) == 3
     assert "Executive Overview" in deck.slides[0].title
+
+
+@pytest.mark.asyncio
+async def test_deepeval_rag_auditor_and_debate_mode():
+    """Verify RAG Triad evaluation metrics and debate persona generation."""
+    from omnicast.observability.evals import eval_auditor
+    from omnicast.agentic_rag.scripter import PodcastDialogueScripter
+
+    scripter = PodcastDialogueScripter()
+    sources = [{"id": "src_debate", "title": "Microservices vs Monoliths"}]
+
+    # 1. Test script generation with Devil's Advocate debate persona
+    dialogue = await scripter.generate_episode_script(
+        workspace_title="Distributed Systems Debate",
+        sources=sources,
+        knowledge_graph_summary="Cluster #1: High latency. Cluster #2: Distributed state.",
+        target_minutes=2,
+        debate_mode="DEVILS_ADVOCATE",
+        tension_level=0.85,
+    )
+    assert len(dialogue) >= 2
+    # Verify entity IDs were bound
+    assert any(len(t.entity_ids) > 0 for t in dialogue)
+
+    # 2. Test DeepEval RAG Triad evaluation
+    evaluation = eval_auditor.evaluate_episode(
+        episode_id="ep_test_eval",
+        dialogue=dialogue,
+        context_corpus="Distributed transactions add high latency and complex failure states.",
+    )
+    assert evaluation.episode_id == "ep_test_eval"
+    assert evaluation.faithfulness_score >= 0.85
+    assert evaluation.hallucination_rate <= 0.15
+    assert evaluation.rag_triad_pass is True
+    assert len(evaluation.verified_claims) > 0
+    assert evaluation.verified_claims[0].confidence_score > 0.8
+

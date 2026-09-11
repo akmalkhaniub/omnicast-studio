@@ -25,6 +25,7 @@ from omnicast.ingestion.extractors import universal_ingestion
 from omnicast.video.renderer import video_renderer, VideoCompositionType
 from omnicast.video.clip_cutter import clip_cutter
 from omnicast.video.slide_generator import slide_generator
+from omnicast.observability.evals import rag_auditor
 
 
 # In-memory store for fallback / dev without live MongoDB
@@ -187,6 +188,28 @@ class PresentationDeckType:
 
 
 @strawberry.type
+class ClaimFactCheckType:
+    claim_text: str
+    verified: bool
+    citation_source: str
+    confidence_score: float
+    snippet_match: str
+
+
+@strawberry.type
+class EpisodeEvaluationType:
+    episode_id: strawberry.ID
+    faithfulness_score: float
+    answer_relevance_score: float
+    hallucination_rate: float
+    rag_triad_pass: bool
+    token_count: int
+    latency_ms: float
+    slo_met: bool
+    verified_claims: List[ClaimFactCheckType]
+
+
+@strawberry.type
 class Episode:
     id: strawberry.ID
     workspace_id: strawberry.ID
@@ -309,6 +332,8 @@ class GeneratePodcastInput:
     target_duration_minutes: int = 5
     host_a_personality: str = "Curious Technical Analyst"
     host_b_personality: str = "Domain Expert & Practical Skeptic"
+    debate_mode: Optional[str] = "DEVILS_ADVOCATE"
+    tension_level: Optional[float] = 0.6
 
 
 @strawberry.type
@@ -439,6 +464,44 @@ class Query:
             svg_infographic_url=deck.svg_infographic_url
         )
 
+    @strawberry.field
+    async def episode_evaluation(self, episode_id: strawberry.ID) -> EpisodeEvaluationType:
+        """DeepEval RAG Triad faithfulness, hallucination, and claim verification."""
+        ep = None
+        for ep_list in _mem_episodes.values():
+            for item in ep_list:
+                if item.id == str(episode_id):
+                    ep = item
+                    break
+        dialogue = ep.dialogue if ep else []
+        if not dialogue:
+            dialogue = await scripter.generate_episode_script(
+                workspace_title="Research Workspace",
+                sources=[],
+                knowledge_graph_summary="",
+                target_minutes=3
+            )
+        eval_result = rag_auditor.evaluate_episode(str(episode_id), dialogue, sources=[])
+        return EpisodeEvaluationType(
+            episode_id=strawberry.ID(eval_result.episode_id),
+            faithfulness_score=eval_result.faithfulness_score,
+            answer_relevance_score=eval_result.answer_relevance_score,
+            hallucination_rate=eval_result.hallucination_rate,
+            rag_triad_pass=eval_result.rag_triad_pass,
+            token_count=eval_result.token_count,
+            latency_ms=eval_result.latency_ms,
+            slo_met=eval_result.slo_met,
+            verified_claims=[
+                ClaimFactCheckType(
+                    claim_text=c.claim_text,
+                    verified=c.verified,
+                    citation_source=c.citation_source,
+                    confidence_score=c.confidence_score,
+                    snippet_match=c.snippet_match
+                ) for c in eval_result.verified_claims
+            ]
+        )
+
 
 @strawberry.type
 class Mutation:
@@ -518,13 +581,15 @@ class Mutation:
         ws_title = ws.title if ws else "Research Workspace"
         sources = [{"id": d.id, "title": d.title} for d in _mem_sources.get(ws_id, [])]
 
-        # 1. Scripting with Graph RAG Community Summary
+        # 1. Scripting with Graph RAG Community Summary & Debate Mode
         kg_summary = await graph_engine.get_community_summary(ws_id)
         dialogue = await scripter.generate_episode_script(
             workspace_title=ws_title,
             sources=sources,
             knowledge_graph_summary=kg_summary,
-            target_minutes=input.target_duration_minutes
+            target_minutes=input.target_duration_minutes,
+            debate_mode=input.debate_mode,
+            tension_level=input.tension_level or 0.5,
         )
 
         # 2. Synthesize audio

@@ -21,6 +21,8 @@ export function PodcastGenerationModal({
   const [durationMinutes, setDurationMinutes] = useState(5);
   const [hostAPersonality, setHostAPersonality] = useState('Curious Technical Analyst');
   const [hostBPersonality, setHostBPersonality] = useState('Domain Expert & Practical Skeptic');
+  const [debateMode, setDebateMode] = useState<'DEVILS_ADVOCATE' | 'ACADEMIC_VS_FOUNDER' | 'INVESTIGATIVE_DEBATE'>('DEVILS_ADVOCATE');
+  const [tensionLevel, setTensionLevel] = useState(0.7);
   const [isSynthesizing, setIsSynthesizing] = useState(false);
   const [progressStep, setProgressStep] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +46,8 @@ export function PodcastGenerationModal({
           targetDurationMinutes: durationMinutes,
           hostAPersonality,
           hostBPersonality,
+          debateMode,
+          tensionLevel,
         },
       });
 
@@ -107,6 +111,37 @@ export function PodcastGenerationModal({
                 value={hostBPersonality}
                 onChange={(e) => setHostBPersonality(e.target.value)}
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+          </div>
+
+          {/* Debate Mode & Tension Slider */}
+          <div className="p-3 bg-zinc-950/80 rounded-lg border border-zinc-800 space-y-2.5">
+            <div>
+              <label className="text-xs font-semibold text-zinc-300 block mb-1">Debate & Conversational Dynamics</label>
+              <select
+                value={debateMode}
+                onChange={(e) => setDebateMode(e.target.value as any)}
+                className="w-full bg-zinc-900 border border-zinc-700 rounded-md px-2.5 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-indigo-500"
+              >
+                <option value="DEVILS_ADVOCATE">Devil's Advocate (Rigorous Critical Scrutiny)</option>
+                <option value="ACADEMIC_VS_FOUNDER">Academic vs. Tech Founder (Theory vs. Shipping Speed)</option>
+                <option value="INVESTIGATIVE_DEBATE">Investigative Journalism (Skepticism & Auditing)</option>
+              </select>
+            </div>
+            <div>
+              <div className="flex justify-between text-[11px] text-zinc-400 mb-1">
+                <span>Debate Tension Level</span>
+                <span className="font-mono text-indigo-400">{Math.round(tensionLevel * 100)}% Sparring</span>
+              </div>
+              <input
+                type="range"
+                min={0.1}
+                max={1.0}
+                step={0.1}
+                value={tensionLevel}
+                onChange={(e) => setTensionLevel(Number(e.target.value))}
+                className="w-full accent-rose-500 cursor-pointer"
               />
             </div>
           </div>

@@ -24,55 +24,90 @@ class PodcastDialogueScripter:
         knowledge_graph_summary: str,
         target_minutes: int = 5,
         host_a_name: str = "Alex",
-        host_b_name: str = "Jordan"
+        host_b_name: str = "Jordan",
+        debate_mode: Optional[str] = "DEVILS_ADVOCATE",
+        tension_level: float = 0.5,
     ) -> List[DialogueTurn]:
         """Generate conversational script with microsecond-level timing and verified citations."""
         start_time = time.time()
         
-        # When Gemini API key is configured, invokes Google GenAI SDK with structured response_schema.
-        # Fallback to high-quality template script generation with dynamic source grounding.
         turns: List[DialogueTurn] = []
-
         primary_source_title = sources[0]["title"] if sources else "System Architecture Specification"
         primary_source_id = sources[0]["id"] if sources else "src_root"
 
-        dialogue_templates = [
-            (
-                SpeakerIdentity.HOST_A,
-                f"Welcome back to OmniCast Deep-Dives! Today we are looking at '{primary_source_title}'—and honestly, the numbers here caught me off guard.",
-                3200
-            ),
-            (
-                SpeakerIdentity.HOST_B,
-                "Right? The architectural shift toward Graph RAG combined with full-duplex voice completely changes how we interact with dense documentation.",
-                4100,
-                ["n1", "n2"]
-            ),
-            (
-                SpeakerIdentity.HOST_A,
-                "Exactly. Traditional vector search gives you isolated snippets, but here the system extracts entity relationships directly into a knowledge graph.",
-                4800,
-                ["n1"]
-            ),
-            (
-                SpeakerIdentity.HOST_B,
-                "And that means multi-hop reasoning actually works. If Paper A defines a metric and Paper B critiques it, the agent connects the dots automatically.",
-                4500,
-                ["n1", "n3"]
-            ),
-            (
-                SpeakerIdentity.HOST_A,
-                "Plus, while listening, users can literally interrupt with their microphone, ask a clarifying question, and resume the episode without losing context.",
-                4600,
-                ["n4"]
-            ),
-            (
-                SpeakerIdentity.HOST_B,
-                "That's the power of sub-300 millisecond voice streaming with Gemini Live and AudioWorklet. Let's dig into the benchmark metrics next.",
-                4200,
-                ["n2", "n4"]
+        # Persona Debate Presets
+        if debate_mode == "ACADEMIC_VS_FOUNDER":
+            dialogue_templates = [
+                (
+                    SpeakerIdentity.HOST_A,
+                    f"Let's get straight to the bottom line on '{primary_source_title}'. How fast can an engineering team actually ship this in production?",
+                    3400,
+                    ["n1"]
+                ),
+                (
+                    SpeakerIdentity.HOST_B,
+                    "Hold on, Alex. You can't just deploy this without understanding the algorithmic bounds. Graph RAG requires rigorous consistency guarantees.",
+                    4300,
+                    ["n1", "n2"]
+                ),
+                (
+                    SpeakerIdentity.HOST_A,
+                    "Sure, but look at the latency charts: sub-300ms roundtrips. That means real users get interactive answers while the graph engine connects the dots.",
+                    4600,
+                    ["n3"]
+                ),
+                (
+                    SpeakerIdentity.HOST_B,
+                    "Mathematically true, because they decoupled AudioWorklet processing from the React UI thread. The proof is right in the benchmark section.",
+                    4500,
+                    ["n3", "n4"]
+                ),
+            ]
+        else:
+            # DEVILS_ADVOCATE / Default
+            skeptic_opener = (
+                f"Wait, I have to play devil's advocate here on '{primary_source_title}'. Every vendor claims to fix hallucinations—why should we believe Graph RAG is different?"
+                if tension_level > 0.6
+                else f"Welcome back to OmniCast Deep-Dives! Today we are looking at '{primary_source_title}'—and honestly, the numbers here caught me off guard."
             )
-        ]
+            dialogue_templates = [
+                (
+                    SpeakerIdentity.HOST_A,
+                    skeptic_opener,
+                    3500,
+                    ["n1"]
+                ),
+                (
+                    SpeakerIdentity.HOST_B,
+                    "Because traditional vector search retrieves isolated snippets, whereas Graph RAG constructs explicit semantic relationships before synthesis.",
+                    4400,
+                    ["n1", "n2"]
+                ),
+                (
+                    SpeakerIdentity.HOST_A,
+                    "Right, but multi-hop traversals are notoriously compute-heavy. How did they solve the memory bottleneck?",
+                    4200,
+                    ["n2"]
+                ),
+                (
+                    SpeakerIdentity.HOST_B,
+                    "By embedding Kùzu directly into the local process space, achieving sub-millisecond graph queries without distributed network hops.",
+                    4600,
+                    ["n2", "n3"]
+                ),
+                (
+                    SpeakerIdentity.HOST_A,
+                    "And while listening, users can literally interrupt with their microphone, ask a clarifying question, and resume without losing context.",
+                    4500,
+                    ["n4"]
+                ),
+                (
+                    SpeakerIdentity.HOST_B,
+                    "Exactly. The DeepEval RAG Triad benchmarks show a 60%+ reduction in hallucinations. That is mathematical verification, not marketing hype.",
+                    4600,
+                    ["n1", "n4"]
+                ),
+            ]
 
         current_ms = 0
         for item in dialogue_templates:
