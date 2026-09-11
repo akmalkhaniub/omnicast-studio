@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Play, Pause, RotateCcw, Volume2, FastForward, Radio, Sparkles, MessageSquare } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, FastForward, Radio, Sparkles, MessageSquare, Mic, X, CornerDownLeft } from 'lucide-react';
 
 interface DialogueLine {
   id: string;
@@ -11,6 +11,7 @@ interface DialogueLine {
   text: string;
   startMs: number;
   endMs: number;
+  entityId: string;
 }
 
 const mockDialogue: DialogueLine[] = [
@@ -22,6 +23,7 @@ const mockDialogue: DialogueLine[] = [
     text: "Welcome back to OmniCast Deep-Dives! Today we are looking at the new Graph RAG and voice streaming architecture.",
     startMs: 0,
     endMs: 3200,
+    entityId: '1', // Gemini 3.8 Flash
   },
   {
     id: '2',
@@ -31,6 +33,7 @@ const mockDialogue: DialogueLine[] = [
     text: "And what stands out immediately is the sub-300ms roundtrip voice latency. They moved audio processing off the React main thread entirely.",
     startMs: 3450,
     endMs: 7550,
+    entityId: '3', // Full-Duplex AudioWorklet
   },
   {
     id: '3',
@@ -40,6 +43,7 @@ const mockDialogue: DialogueLine[] = [
     text: "Exactly. By streaming 16kHz linear PCM via an AudioWorklet, you can literally interrupt with your microphone without frame drops.",
     startMs: 7800,
     endMs: 12600,
+    entityId: '3', // Full-Duplex AudioWorklet
   },
   {
     id: '4',
@@ -49,16 +53,53 @@ const mockDialogue: DialogueLine[] = [
     text: "Plus, the knowledge graph connects concepts across papers using multi-hop reasoning, so citations are mathematically grounded.",
     startMs: 12850,
     endMs: 17350,
+    entityId: '2', // Graph RAG Ontology
   },
 ];
 
-export function WaveformPlayer() {
+interface WaveformPlayerProps {
+  onActiveEntityChange?: (entityId: string) => void;
+  seekTargetMs?: number | null;
+}
+
+export function WaveformPlayer({ onActiveEntityChange, seekTargetMs }: WaveformPlayerProps = {}) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentMs, setCurrentMs] = useState(4200);
+  const [showBargeIn, setShowBargeIn] = useState(false);
+  const [question, setQuestion] = useState('');
+  const [clarification, setClarification] = useState<string | null>(null);
+  const [isAnswering, setIsAnswering] = useState(false);
 
-  const activeTurn = mockDialogue.find(
-    (turn) => currentMs >= turn.startMs && currentMs <= turn.endMs
-  ) || mockDialogue[1];
+  // Sync seekTargetMs from Mind Map click
+  React.useEffect(() => {
+    if (seekTargetMs !== undefined && seekTargetMs !== null) {
+      setCurrentMs(seekTargetMs);
+      setIsPlaying(true);
+    }
+  }, [seekTargetMs]);
+
+  const activeTurn =
+    mockDialogue.find((turn) => currentMs >= turn.startMs && currentMs <= turn.endMs) ||
+    mockDialogue[1];
+
+  // Notify parent of active concept for Mind Map illumination
+  React.useEffect(() => {
+    if (activeTurn && onActiveEntityChange) {
+      onActiveEntityChange(activeTurn.entityId);
+    }
+  }, [activeTurn.entityId, onActiveEntityChange]);
+
+  const handleAskHosts = () => {
+    if (!question.trim()) return;
+    setIsPlaying(false);
+    setIsAnswering(true);
+    setTimeout(() => {
+      setClarification(
+        `Host Jordan: "Great question! Grounded directly in the source architecture: '${question.trim()}' is resolved through Graph RAG's entity relationship index, reducing hallucination by over 60% compared to isolated vector chunks."`
+      );
+      setIsAnswering(false);
+    }, 1200);
+  };
 
   return (
     <div className="flex flex-col h-full bg-zinc-900/60 rounded-lg border border-zinc-800 p-4 justify-between">
@@ -130,6 +171,17 @@ export function WaveformPlayer() {
             <button className="p-2 text-zinc-400 hover:text-zinc-200 transition">
               <FastForward className="w-4 h-4" />
             </button>
+            <button
+              onClick={() => {
+                setIsPlaying(false);
+                setShowBargeIn(true);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600/90 hover:bg-rose-500 text-white rounded-full text-xs font-semibold shadow transition animate-pulse"
+              title="Pause episode and ask the hosts a clarifying question"
+            >
+              <Mic className="w-3.5 h-3.5" />
+              <span>Ask the Hosts</span>
+            </button>
           </div>
 
           <div className="flex items-center gap-2">
@@ -139,6 +191,73 @@ export function WaveformPlayer() {
             <Volume2 className="w-4 h-4 text-zinc-400" />
           </div>
         </div>
+
+        {/* Live Barge-In Question Drawer */}
+        {showBargeIn && (
+          <div className="mt-3 p-3 bg-zinc-950 rounded-lg border border-rose-500/40 space-y-2 animate-in fade-in">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-rose-400">
+                <Mic className="w-3.5 h-3.5" />
+                <span>Live Co-Pilot Barge-In (Episode Paused at 00:04)</span>
+              </div>
+              <button
+                onClick={() => {
+                  setShowBargeIn(false);
+                  setClarification(null);
+                }}
+                className="text-zinc-400 hover:text-zinc-200"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {!clarification ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  placeholder="Ask hosts: e.g. Why Kùzu graph instead of Neo4j?"
+                  className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-2.5 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-rose-500"
+                  onKeyDown={(e) => e.key === 'Enter' && handleAskHosts()}
+                />
+                <button
+                  onClick={handleAskHosts}
+                  disabled={isAnswering}
+                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white rounded text-xs font-medium transition flex items-center gap-1"
+                >
+                  {isAnswering ? (
+                    <Sparkles className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <CornerDownLeft className="w-3 h-3" />
+                  )}
+                  <span>Ask</span>
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="p-2.5 bg-zinc-900/90 rounded border border-emerald-500/30 text-xs text-zinc-200">
+                  <div className="text-[10px] text-emerald-400 font-mono mb-1">
+                    ✓ GROUNDED CITATION (Graph RAG Engine)
+                  </div>
+                  <p>{clarification}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowBargeIn(false);
+                    setClarification(null);
+                    setQuestion('');
+                    setIsPlaying(true);
+                  }}
+                  className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-medium transition flex items-center justify-center gap-1.5"
+                >
+                  <Play className="w-3 h-3" />
+                  <span>Resume Episode Playback</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

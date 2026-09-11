@@ -46,6 +46,18 @@ class DialogueTurn(BaseModel):
     start_ms: int = 0
     end_ms: int = 0
     citations: List[SourceCitation] = []
+    entity_ids: List[str] = Field(default_factory=list)
+
+
+class HostClarification(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    episode_id: str
+    question: str
+    answer_text: str
+    speaker: SpeakerIdentity
+    audio_url: Optional[str] = None
+    citations: List[SourceCitation] = []
+    resume_time_ms: int = 0
 
 
 class VideoComposition(BaseModel):

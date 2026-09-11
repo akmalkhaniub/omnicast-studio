@@ -37,6 +37,7 @@ yarn-error.log*
 .next/
 out/
 .turbo
+*.tsbuildinfo
 
 # Environment & Secrets (NEVER COMMIT)
 .env

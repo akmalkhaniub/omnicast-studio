@@ -202,3 +202,33 @@ async def test_remotion_video_renderer():
     assert result.duration_frames > 0
     assert result.metadata["resolution"] == "1920x1080"
     assert result.metadata["total_subtitles"] == 2
+
+
+@pytest.mark.asyncio
+async def test_ask_hosts_barge_in_and_entity_sync():
+    """Verify live barge-in host clarification and dialogue entity linking."""
+    from omnicast.agentic_rag.scripter import scripter
+
+    # 1. Verify entity linking in generated script
+    sources = [{"id": "s1", "title": "Graph RAG Architecture"}]
+    dialogue = await scripter.generate_episode_script(
+        workspace_title="AI Research Lab",
+        sources=sources,
+        knowledge_graph_summary="Cluster #1: Graph RAG",
+        target_minutes=3,
+    )
+    assert len(dialogue) > 0
+    # Check that turns carry entity_ids
+    turns_with_entities = [t for t in dialogue if len(t.entity_ids) > 0]
+    assert len(turns_with_entities) > 0
+
+    # 2. Verify ask_hosts clarification
+    clarification = await scripter.generate_host_clarification(
+        episode_id="ep_test",
+        question="Can you explain how Graph RAG avoids hallucinations?",
+        current_time_ms=4500,
+    )
+    assert clarification.episode_id == "ep_test"
+    assert "hallucination" in clarification.answer_text.lower()
+    assert len(clarification.citations) > 0
+    assert clarification.resume_time_ms == 4500

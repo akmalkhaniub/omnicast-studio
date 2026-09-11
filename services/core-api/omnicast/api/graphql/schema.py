@@ -115,6 +115,19 @@ class DialogueTurn:
     start_ms: int
     end_ms: int
     citations: List[SourceCitation]
+    entity_ids: List[strawberry.ID] = strawberry.field(default_factory=list)
+
+
+@strawberry.type
+class ClarificationResponse:
+    id: strawberry.ID
+    episode_id: strawberry.ID
+    question: str
+    answer_text: str
+    speaker: SpeakerIdentity
+    audio_url: Optional[str] = None
+    citations: List[SourceCitation]
+    resume_time_ms: int
 
 
 @strawberry.type
@@ -450,6 +463,7 @@ class Mutation:
                     text=t.text,
                     start_ms=t.start_ms,
                     end_ms=t.end_ms,
+                    entity_ids=[strawberry.ID(eid) for eid in getattr(t, 'entity_ids', [])],
                     citations=[
                         SourceCitation(
                             source_id=c.source_id,
@@ -462,6 +476,38 @@ class Mutation:
                 ) for t in ep.dialogue
             ],
             created_at=ep.created_at
+        )
+
+    @strawberry.mutation
+    async def ask_hosts(
+        self,
+        episode_id: strawberry.ID,
+        question: str,
+        current_time_ms: int = 0
+    ) -> ClarificationResponse:
+        """Handles live barge-in clarifying questions from the user."""
+        clarification = await scripter.generate_host_clarification(
+            episode_id=str(episode_id),
+            question=question,
+            current_time_ms=current_time_ms,
+        )
+        return ClarificationResponse(
+            id=strawberry.ID(clarification.id),
+            episode_id=strawberry.ID(clarification.episode_id),
+            question=clarification.question,
+            answer_text=clarification.answer_text,
+            speaker=SpeakerIdentity(clarification.speaker.value),
+            audio_url=clarification.audio_url,
+            citations=[
+                SourceCitation(
+                    source_id=c.source_id,
+                    source_title=c.source_title,
+                    page_number=c.page_number,
+                    timestamp_sec=c.timestamp_sec,
+                    snippet=c.snippet
+                ) for c in clarification.citations
+            ],
+            resume_time_ms=clarification.resume_time_ms
         )
 
 

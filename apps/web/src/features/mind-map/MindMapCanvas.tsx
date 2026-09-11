@@ -48,10 +48,42 @@ const initialEdges: Edge[] = [
   { id: 'e3-4', source: '3', target: '4', label: 'SYNCS_AUDIO', style: { stroke: '#f59e0b' } },
 ];
 
-export function MindMapCanvas() {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+interface MindMapCanvasProps {
+  activeEntityId?: string | null;
+  onSelectEntity?: (label: string, entityId: string) => void;
+}
+
+export function MindMapCanvas({ activeEntityId, onSelectEntity }: MindMapCanvasProps = {}) {
   const [selectedNode, setSelectedNode] = useState<string | null>('Gemini 3.8 Flash');
+
+  // Compute node styling dynamically based on active audio playback
+  const styledNodes = initialNodes.map((node) => {
+    const labelStr = String(node.data?.label ?? '');
+    const isActive =
+      Boolean(activeEntityId) &&
+      (node.id === activeEntityId ||
+        labelStr.toLowerCase().includes(activeEntityId!.toLowerCase()) ||
+        activeEntityId!.toLowerCase().includes(labelStr.toLowerCase()));
+
+    return {
+      ...node,
+      style: {
+        ...node.style,
+        border: isActive ? '2px solid #38bdf8' : node.style?.border,
+        boxShadow: isActive ? '0 0 15px rgba(56, 189, 248, 0.6)' : 'none',
+        transform: isActive ? 'scale(1.05)' : 'scale(1)',
+        transition: 'all 0.25s ease-in-out',
+      },
+    };
+  });
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(styledNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  // Sync node styles when activeEntityId changes
+  React.useEffect(() => {
+    setNodes(styledNodes);
+  }, [activeEntityId]);
 
   return (
     <div className="relative w-full h-full bg-zinc-950 rounded-lg border border-zinc-800 overflow-hidden flex flex-col">
@@ -78,7 +110,13 @@ export function MindMapCanvas() {
           edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
-          onNodeClick={(_, node) => setSelectedNode(node.data.label as string)}
+          onNodeClick={(_, node) => {
+            const lbl = node.data.label as string;
+            setSelectedNode(lbl);
+            if (onSelectEntity) {
+              onSelectEntity(lbl, node.id);
+            }
+          }}
           fitView
         >
           <Background color="#27272a" gap={16} />

@@ -24,6 +24,21 @@ export default function StudioPage() {
   const [activeTab, setActiveTab] = useState<'mindmap' | 'documents'>('mindmap');
   const [workspaceId] = useState<string>('default_workspace');
 
+  // Bi-directional Mind Map ↔ Audio Playback state
+  const [activeEntityId, setActiveEntityId] = useState<string | null>('1');
+  const [seekTargetMs, setSeekTargetMs] = useState<number | null>(null);
+
+  const handleSelectEntity = (label: string, entityId: string) => {
+    setActiveEntityId(entityId);
+    const timestampMap: Record<string, number> = {
+      '1': 0,     // Gemini 3.8 Flash
+      '2': 12850, // Graph RAG Ontology
+      '3': 3450,  // Full-Duplex AudioWorklet
+      '4': 14000, // Remotion Video Studio
+    };
+    setSeekTargetMs(timestampMap[entityId] ?? 0);
+  };
+
   // Modals state
   const [isIngestOpen, setIsIngestOpen] = useState(false);
   const [isPodcastOpen, setIsPodcastOpen] = useState(false);
@@ -111,7 +126,10 @@ export default function StudioPage() {
 
           <div className="flex-1 w-full h-full min-h-0">
             {activeTab === 'mindmap' ? (
-              <MindMapCanvas />
+              <MindMapCanvas
+                activeEntityId={activeEntityId}
+                onSelectEntity={handleSelectEntity}
+              />
             ) : (
               <div className="w-full h-full bg-zinc-900/60 border border-zinc-800 rounded-lg p-4 text-xs text-zinc-300 overflow-y-auto">
                 <div className="flex items-center justify-between mb-3">
@@ -154,7 +172,10 @@ export default function StudioPage() {
         {/* Right 4 Columns: Dual-Host Audio Studio & Full-Duplex Voice Controller */}
         <section className="col-span-4 flex flex-col h-full gap-4">
           <div className="h-3/5 min-h-0">
-            <WaveformPlayer />
+            <WaveformPlayer
+              onActiveEntityChange={(eid) => setActiveEntityId(eid)}
+              seekTargetMs={seekTargetMs}
+            />
           </div>
           <div className="h-2/5 min-h-0">
             <AudioWorkletController />
