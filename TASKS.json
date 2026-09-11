@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "project": "OmniCast Studio",
+  "version": "1.0.0",
+  "status": "IN_PROGRESS",
+  "tasks": [
+    {
+      "id": "TASK-01",
+      "phase": "Phase 1: Architecture & Spec Foundation",
+      "title": "Codify SPEC, ADRs, Schema, and Security Whitepaper",
+      "status": "COMPLETED",
+      "assigned_to": "Architect",
+      "artifacts": ["SPEC.md", "PRD.md", "SECURITY.md", "EVALUATION_RUBRIC.md", "SYSTEM_DESIGN.md", "SLO_FRAMEWORK.md", "AGENTS.md", "contracts/schema.graphql"]
+    },
+    {
+      "id": "TASK-02",
+      "phase": "Phase 1: Core API Scaffolding",
+      "title": "Scaffold FastAPI, Strawberry GraphQL, and Polyglot Storage Connectors",
+      "status": "COMPLETED",
+      "assigned_to": "Backend Lead",
+      "artifacts": ["services/core-api/omnicast/main.py", "services/core-api/omnicast/api/graphql/schema.py", "services/core-api/omnicast/storage/models.py", "services/core-api/omnicast/knowledge_graph/engine.py"]
+    },
+    {
+      "id": "TASK-03",
+      "phase": "Phase 2: Real-Time Voice & Live Audio Streaming",
+      "title": "Implement AudioWorklet 16kHz PCM Streamer & Gemini Multimodal Live API WebSocket",
+      "status": "IN_PROGRESS",
+      "assigned_to": "Audio/Voice Lead",
+      "artifacts": ["services/core-api/omnicast/api/live_ws.py", "apps/web/public/worklets/audio-processor.js"]
+    },
+    {
+      "id": "TASK-04",
+      "phase": "Phase 2: Agentic Graph RAG & Dual-Host Dialogue",
+      "title": "Build Gemini 3.8 Flash Scripter & Kokoro-82M Dual-Voice Synthesis Pipeline",
+      "status": "IN_PROGRESS",
+      "assigned_to": "AI/ML Lead",
+      "artifacts": ["services/core-api/omnicast/agentic_rag/scripter.py", "services/core-api/omnicast/audio/synthesizer.py"]
+    },
+    {
+      "id": "TASK-05",
+      "phase": "Phase 3: Frontend FSD Studio & React Flow Mind Map",
+      "title": "Scaffold Next.js 16 + React 19 Client with Dockview & Interactive Concept Graph",
+      "status": "READY_TO_BUILD",
+      "assigned_to": "Frontend Lead",
+      "artifacts": ["apps/web/src/features/mind-map/", "apps/web/src/features/audio-studio/"]
+    },
+    {
+      "id": "TASK-06",
+      "phase": "Phase 3: Programmatic Video Studio (Remotion)",
+      "title": "Build Remotion 4.x Audiogram, 16:9 Slide Video, and 9:16 Shorts Composition Templates",
+      "status": "READY_TO_BUILD",
+      "assigned_to": "Media Lead",
+      "artifacts": ["apps/video-renderer/src/compositions/"]
+    },
+    {
+      "id": "TASK-07",
+      "phase": "Phase 4: CI/CD Quality Gates & Golden Evals",
+      "title": "Configure GitHub Actions CI with DeepEval RAG Triad and Gitleaks Secret Scanners",
+      "status": "READY_TO_BUILD",
+      "assigned_to": "DevOps/SRE",
+      "artifacts": [".github/workflows/ci.yml", "services/core-api/tests/test_core.py"]
+    }
+  ]
+}

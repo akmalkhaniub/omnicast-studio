@@ -1,0 +1,158 @@
+"""
+OmniCast Studio Contract-First GraphQL Schema
+Single Source of Truth for Web Client (Next.js 16) and Core API (FastAPI)
+"""
+
+scalar DateTime
+scalar JSON
+
+enum SourceType {
+  PDF
+  URL
+  YOUTUBE
+  CODE
+  MARKDOWN
+}
+
+enum SpeakerIdentity {
+  HOST_A
+  HOST_B
+  USER
+}
+
+enum SynthesisStatus {
+  PENDING
+  ANALYZING_GRAPH
+  SCRIPTING_DIALOGUE
+  SYNTHESIZING_AUDIO
+  RENDERING_VIDEO
+  COMPLETED
+  FAILED
+}
+
+type SourceCitation {
+  sourceId: ID!
+  sourceTitle: String!
+  pageNumber: Int
+  timestampSec: Float
+  snippet: String!
+}
+
+type SourceDocument {
+  id: ID!
+  workspaceId: ID!
+  title: String!
+  sourceType: SourceType!
+  tokenCount: Int!
+  createdAt: DateTime!
+}
+
+type GraphNode {
+  id: ID!
+  label: String!
+  category: String!
+  communityId: Int
+  degree: Int!
+  citation: SourceCitation
+}
+
+type GraphEdge {
+  id: ID!
+  source: ID!
+  target: ID!
+  relationship: String!
+  weight: Float!
+}
+
+type KnowledgeGraph {
+  nodes: [GraphNode!]!
+  edges: [GraphEdge!]!
+  totalNodes: Int!
+  totalEdges: Int!
+}
+
+type DialogueTurn {
+  id: ID!
+  speaker: SpeakerIdentity!
+  text: String!
+  startMs: Int!
+  endMs: Int!
+  citations: [SourceCitation!]!
+}
+
+type VideoComposition {
+  id: ID!
+  widescreenUrl: String
+  verticalShortUrl: String
+  fps: Int!
+  durationFrames: Int!
+  renderStatus: String!
+}
+
+type Episode {
+  id: ID!
+  workspaceId: ID!
+  title: String!
+  summary: String!
+  audioUrl: String
+  durationMs: Int!
+  status: SynthesisStatus!
+  dialogue: [DialogueTurn!]!
+  videoComposition: VideoComposition
+  createdAt: DateTime!
+}
+
+type Workspace {
+  id: ID!
+  title: String!
+  description: String
+  sources: [SourceDocument!]!
+  knowledgeGraph: KnowledgeGraph!
+  episodes: [Episode!]!
+  createdAt: DateTime!
+}
+
+type Query {
+  workspace(id: ID!): Workspace
+  listWorkspaces: [Workspace!]!
+  episode(id: ID!): Episode
+  knowledgeGraph(workspaceId: ID!): KnowledgeGraph!
+}
+
+input CreateWorkspaceInput {
+  title: String!
+  description: String
+}
+
+input IngestDocumentInput {
+  workspaceId: ID!
+  title: String!
+  sourceType: SourceType!
+  content: String!
+}
+
+input GeneratePodcastInput {
+  workspaceId: ID!
+  topic: String
+  targetDurationMinutes: Int = 5
+  hostAPersonality: String = "Curious Technical Analyst"
+  hostBPersonality: String = "Domain Expert & Practical Skeptic"
+}
+
+type Mutation {
+  createWorkspace(input: CreateWorkspaceInput!): Workspace!
+  ingestDocument(input: IngestDocumentInput!): SourceDocument!
+  triggerPodcastSynthesis(input: GeneratePodcastInput!): Episode!
+}
+
+type SynthesisProgressEvent {
+  episodeId: ID!
+  status: SynthesisStatus!
+  percentComplete: Int!
+  currentStepMessage: String!
+}
+
+type Subscription {
+  synthesisProgress(episodeId: ID!): SynthesisProgressEvent!
+  liveGraphNodeAdded(workspaceId: ID!): GraphNode!
+}
