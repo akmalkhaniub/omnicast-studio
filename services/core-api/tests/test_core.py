@@ -232,3 +232,54 @@ async def test_ask_hosts_barge_in_and_entity_sync():
     assert "hallucination" in clarification.answer_text.lower()
     assert len(clarification.citations) > 0
     assert clarification.resume_time_ms == 4500
+
+
+@pytest.mark.asyncio
+async def test_ai_viral_clip_cutter():
+    """Verify 9:16 viral clip cutting and karaoke word-level timestamp generation."""
+    from omnicast.video.clip_cutter import clip_cutter
+    from omnicast.storage.models import DialogueTurn, SpeakerIdentity
+
+    dialogue = [
+        DialogueTurn(
+            id="t1",
+            speaker=SpeakerIdentity.HOST_A,
+            text="Traditional vector search gives you isolated snippets, but Graph RAG connects relationships.",
+            start_ms=0,
+            end_ms=4500,
+        ),
+        DialogueTurn(
+            id="t2",
+            speaker=SpeakerIdentity.HOST_B,
+            text="And that means multi-hop reasoning actually works across research papers.",
+            start_ms=4750,
+            end_ms=9000,
+        ),
+    ]
+
+    clips = clip_cutter.cut_viral_moments("ep_viral_test", dialogue, max_clips=2)
+    assert len(clips) == 2
+    assert clips[0].viral_score > 0.85
+    assert clips[0].duration_sec > 0
+    assert len(clips[0].karaoke_words) > 0
+    # Verify word timing monotonicity
+    for w in clips[0].karaoke_words:
+        assert w.start_ms <= w.end_ms
+        assert len(w.word) > 0
+
+
+@pytest.mark.asyncio
+async def test_presentation_slide_generator():
+    """Verify HTML5 slide deck and SVG infographic generation."""
+    from omnicast.video.slide_generator import slide_generator
+
+    deck = await slide_generator.generate_deck(
+        workspace_id="ws_slide_test",
+        workspace_title="Graph RAG & Voice AI",
+        graph_summary="Cluster #1: Graph RAG\nCluster #2: AudioWorklet",
+    )
+    assert deck.total_slides == 3
+    assert deck.html_deck_url.endswith(".html")
+    assert deck.svg_infographic_url.endswith(".svg")
+    assert len(deck.slides) == 3
+    assert "Executive Overview" in deck.slides[0].title

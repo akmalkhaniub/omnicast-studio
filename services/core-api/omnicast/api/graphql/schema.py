@@ -23,6 +23,8 @@ from omnicast.agentic_rag.scripter import scripter
 from omnicast.audio.synthesizer import audio_synthesizer
 from omnicast.ingestion.extractors import universal_ingestion
 from omnicast.video.renderer import video_renderer, VideoCompositionType
+from omnicast.video.clip_cutter import clip_cutter
+from omnicast.video.slide_generator import slide_generator
 
 
 # In-memory store for fallback / dev without live MongoDB
@@ -138,6 +140,50 @@ class VideoComposition:
     fps: int = 30
     duration_frames: int = 0
     render_status: str = "PENDING"
+
+
+@strawberry.type
+class KaraokeWordType:
+    word: str
+    start_ms: int
+    end_ms: int
+    speaker: str
+
+
+@strawberry.type
+class SocialViralClipType:
+    id: strawberry.ID
+    episode_id: strawberry.ID
+    title: str
+    hook: str
+    start_ms: int
+    end_ms: int
+    duration_sec: float
+    viral_score: float
+    video_url: str
+    platform_tags: List[str]
+    karaoke_words: List[KaraokeWordType]
+
+
+@strawberry.type
+class PresentationSlideType:
+    slide_number: int
+    title: str
+    subtitle: str
+    bullet_points: List[str]
+    graph_entities: List[str]
+    citation: str
+
+
+@strawberry.type
+class PresentationDeckType:
+    deck_id: strawberry.ID
+    workspace_id: strawberry.ID
+    title: str
+    total_slides: int
+    slides: List[PresentationSlideType]
+    html_deck_url: str
+    svg_infographic_url: str
 
 
 @strawberry.type
@@ -322,6 +368,75 @@ class Query:
             ],
             total_nodes=g.total_nodes,
             total_edges=g.total_edges
+        )
+
+    @strawberry.field
+    async def social_clips(self, episode_id: strawberry.ID) -> List[SocialViralClipType]:
+        """Returns top viral 9:16 shorts clips with word-level karaoke timestamps."""
+        # Find episode or generate from mock turns
+        ep = None
+        for ep_list in _mem_episodes.values():
+            for item in ep_list:
+                if item.id == str(episode_id):
+                    ep = item
+                    break
+        dialogue = ep.dialogue if ep else []
+        if not dialogue:
+            dialogue = await scripter.generate_episode_script(
+                workspace_title="Research Workspace",
+                sources=[],
+                knowledge_graph_summary="",
+                target_minutes=3
+            )
+
+        clips = clip_cutter.cut_viral_moments(str(episode_id), dialogue)
+        return [
+            SocialViralClipType(
+                id=strawberry.ID(c.id),
+                episode_id=strawberry.ID(c.episode_id),
+                title=c.title,
+                hook=c.hook,
+                start_ms=c.start_ms,
+                end_ms=c.end_ms,
+                duration_sec=c.duration_sec,
+                viral_score=c.viral_score,
+                video_url=c.video_url,
+                platform_tags=c.platform_tags,
+                karaoke_words=[
+                    KaraokeWordType(
+                        word=w.word,
+                        start_ms=w.start_ms,
+                        end_ms=w.end_ms,
+                        speaker=w.speaker
+                    ) for w in c.karaoke_words
+                ]
+            ) for c in clips
+        ]
+
+    @strawberry.field
+    async def presentation_deck(self, workspace_id: strawberry.ID) -> PresentationDeckType:
+        """Returns generated 16:9 presentation deck and SVG infographic."""
+        ws = _mem_workspaces.get(str(workspace_id))
+        ws_title = ws.title if ws else "OmniCast Research"
+        kg_summary = await graph_engine.get_community_summary(str(workspace_id))
+        deck = await slide_generator.generate_deck(str(workspace_id), ws_title, kg_summary)
+        return PresentationDeckType(
+            deck_id=strawberry.ID(deck.deck_id),
+            workspace_id=strawberry.ID(deck.workspace_id),
+            title=deck.title,
+            total_slides=deck.total_slides,
+            slides=[
+                PresentationSlideType(
+                    slide_number=s.slide_number,
+                    title=s.title,
+                    subtitle=s.subtitle,
+                    bullet_points=s.bullet_points,
+                    graph_entities=s.graph_entities,
+                    citation=s.citation
+                ) for s in deck.slides
+            ],
+            html_deck_url=deck.html_deck_url,
+            svg_infographic_url=deck.svg_infographic_url
         )
 
 
